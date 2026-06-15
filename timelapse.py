@@ -100,7 +100,7 @@ def choose_output_dir() -> pathlib.Path:
     """
     Prefer an attached USB drive or dedicated /media mount; fall back to ~/timelapse.
     """
-    for mount in pathlib.Path("/media").glob("**"):
+    for mount in pathlib.Path("/media").glob("*"):
         if mount.is_dir() and os.access(mount, os.W_OK):
             return mount / "timelapse"
     return pathlib.Path.home() / "timelapse"
@@ -196,9 +196,12 @@ def capture_session(
             if now >= next_shot:
                 photo_num += 1
                 filename = photo_dir / f"frame_{photo_num:06d}.jpg"
-                cam.capture_file(str(filename))
-                captured.append(filename)
-                bar.update(1)
+                try:
+                    cam.capture_file(str(filename))
+                    captured.append(filename)
+                    bar.update(1)
+                except Exception as exc:
+                    print(f"\n  {YELLOW}Warning: frame {photo_num} failed ({exc}) — skipping.{NC}")
                 next_shot += interval_s
 
             # Sleep in small increments so signals are handled promptly
@@ -312,7 +315,7 @@ def main():
     video_path = session_dir / f"timelapse_{timestamp}.mp4"
 
     # ── Estimate video length ─────────────────────────────────────────────────
-    total_frames = (duration_min * 60) // interval_s
+    total_frames = max(1, (duration_min * 60) // interval_s)
     video_seconds = total_frames / fps
     print(f"\n  Estimated video length: {human_duration(video_seconds)} at {fps} fps")
     print(f"  Output directory: {session_dir}\n")
@@ -346,8 +349,12 @@ def main():
     # Offer to delete raw frames to save SD card space
     keep = input("  Keep raw JPEG frames? [Y/n]: ").strip().lower()
     if keep in ("n", "no"):
-        shutil.rmtree(photo_dir)
-        print(f"  {YELLOW}Frames deleted.{NC}")
+        try:
+            shutil.rmtree(photo_dir)
+            print(f"  {YELLOW}Frames deleted.{NC}")
+        except OSError as exc:
+            print(f"  {RED}Could not delete frames: {exc}{NC}")
+            print(f"  You can remove them manually: rm -rf {photo_dir}")
     else:
         print(f"  Frames kept.")
     print()

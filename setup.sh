@@ -62,7 +62,7 @@ country=${COUNTRY^^}
 EOF
     fi
 
-    PSK=$(wpa_passphrase "$WIFI_SSID" "$WIFI_PASSWORD" | grep -v "#psk" | grep "psk=" | awk -F= '{print $2}')
+    PSK=$(wpa_passphrase "$WIFI_SSID" <<< "$WIFI_PASSWORD" | grep -v "#psk" | grep "psk=" | awk -F= '{print $2}')
 
     # Remove existing entry for this SSID if present
     python3 - "$WPA_CONF" "$WIFI_SSID" <<'PYEOF'
@@ -102,7 +102,8 @@ echo -e "  ${GREEN}SSH enabled and running.${NC}"
 
 HOSTNAME=$(hostname)
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-echo -e "  Connect with: ${CYAN}ssh $(logname)@${IP:-<ip-address>}${NC}  (hostname: ${HOSTNAME})"
+ACTUAL_USER="${SUDO_USER:-$(logname)}"
+echo -e "  Connect with: ${CYAN}ssh ${ACTUAL_USER}@${IP:-<ip-address>}${NC}  (hostname: ${HOSTNAME})"
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -133,7 +134,7 @@ touch "$SCRIPT_DIR/.setup_complete"
 
 read -rp "  Install timelapse as a systemd service for easy launch? [y/N] " INSTALL_SERVICE
 if [[ "$INSTALL_SERVICE" =~ ^[Yy]$ ]]; then
-    ACTUAL_USER=$(logname)
+    ACTUAL_USER="${SUDO_USER:-$(logname)}"
     ACTUAL_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
     cat > /etc/systemd/system/timelapse.service <<EOF
 [Unit]
